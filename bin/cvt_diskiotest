@@ -1,0 +1,14 @@
+#/bin/sh
+
+#获取当前路径所在分区
+CURRENT_PATH=`pwd`
+CURRENT_PARTITION=`df -P ${CURRENT_PATH} | tail -1 | cut -d' ' -f 1`
+
+READ_RESULT=`sudo hdparm -t ${CURRENT_PARTITION} | grep "Timing" | cut -d '=' -f 2`
+dd if=/dev/zero of=tmp.dd bs=1024 count=1000k conv=fdatasync 2> tmp.txt
+WRITE_RESULT=`cat tmp.txt | grep "copied" | cut -d ',' -f 3`
+
+sudo rm -f tmp.txt tmp.dd
+
+echo "${CURRENT_PARTITION} disk reads : ${READ_RESULT}"
+echo "${CURRENT_PARTITION} disk writes : ${WRITE_RESULT}"

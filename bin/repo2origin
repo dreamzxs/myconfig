@@ -1,0 +1,45 @@
+#!/bin/bash
+
+repo list>/dev/null
+if [ $? -ne 0 ];then
+        echo "there is not a repo project!"
+        exit 1;
+fi
+
+manifest_branch=`echo $(repo info | grep "Manifest merge branch:" | cut -d ':' -f 2)`
+
+repo sync -d -c || exit 1
+
+echo "============== repo start ================="
+for i in `repo list|tr -d ' ' `
+do
+        prjname=`echo $i|cut -d ':' -f2`
+        prjpath=`echo $i|cut -d ':' -f1`
+        revision=`echo $(repo info $prjname|grep "Current revision"|cut -d ':' -f2)`
+        echo "$prjname --> $revision"
+        repo start $revision $prjname
+done
+echo "-------------------------------------------"
+
+repo forall -c "git reset --hard m/${manifest_branch}" || exit 1
+repo forall -c 'git clean -dfx' || exit 1
+
+#remove build tmp dirs in project root dir
+if [ -d .repo ];then
+    	dirList=`ls -F | grep "/" | cut -d '/' -f 1`
+	repoList=`repo  list -p`
+	for tmp in ${dirList}
+	do
+		isOriginDir=`echo ${repoList} | grep "${tmp}"`
+		
+		if [ "${isOriginDir}"x == ""x ];then
+			rm -rf ${tmp}
+			echo "### removing tmp dir ${tmp} ..."
+		fi
+	done
+fi
+
+repo sync -cj4 || exit 1
+
+/usr/local/bin/put_repo_branch_info
+

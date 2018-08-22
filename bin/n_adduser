@@ -1,0 +1,177 @@
+#!/bin/bash
+
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2014 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________  ___________
+#     / / ________ \      / / _____   ____|| |  _______|
+#    / / /      \ \ \    / / /   | | |     | | |
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \_\_______|    \_\/        |_|_|     |_|_________|
+#
+################################################################################
+# descript:
+#     --> cvteUser 本脚本用于批量添加/删除用户，用户初始密码是 123 ，首次登陆需要修改密码
+#     --> 格式：.cvteUser 参数1 参数2
+#      参数1：用户名或文件名
+#      参数2：操作：1-添加，2-删除
+#      例如： cvteUser user 1
+#             cvteUser userfile 1
+#######################
+# filename: cvteUser
+# author  : liaozurui
+# date    : 2014-11-25
+# version : V1.0.0
+# note    :
+# ========history=============
+# auther  :
+# date    :
+# version :
+# note    :
+#
+################################################################################
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+function error()
+{
+    echo -e "\033[31;1m "
+    echo "warning: the commond format is : cvteUser par1 par2"
+    echo "eg:cvteUser user01  1"
+    echo "   par1 respect your choice-add or del:"
+    echo "   1:add memeber  ***********"
+    echo "   2:del memeber  ***********"
+    echo "   par2: username or user-list-file"
+    echo -e "\033[0m"
+}
+
+# p1:file or username
+# p2:imode
+
+imode=$1
+
+if [ $# -lt 2 ]
+then
+    error
+    exit 1
+fi
+
+
+if [ "$1" == "1" ]; then
+     echo "************************* add users *******************************"
+     echo -n " Are you ensure to add?[y|Y/n|N] "
+     read yes
+     if [ "$yes" == "y" -o "$yes" == "Y"  -o x"$yes"==x"" ] ;
+     then
+        echo "--> add users...";
+     else
+        exit 1
+     fi
+elif [ "$1" == "2" ]; then
+     echo "************************* delete users *******************************"
+     echo -n " Are you ensure to delete?[y|Y/n|N] "
+     read yes
+     if [ "$yes" == "y" -o "$yes" == "Y" ] ;
+     then
+        echo "--> delete users...";
+     else
+        error
+        exit 1
+     fi
+else
+    error
+    exit 1
+fi
+
+
+group_id=9999
+group_name=cvter_tv
+# curpasswd=123
+shell=`whereis bash | cut -d " " -f 2`
+
+ifexist=`cat /etc/group | grep "^${group_name}:" |cut -d ":" -f 1`
+if [ ! x"$ifexist" == x"$group_name" ];
+then
+    sudo groupadd -g $group_id $group_name
+fi
+
+
+function _setUserInfo()
+{
+    curaccount=$1
+    sudo chown $curaccount:$group_name /home/$curaccount
+    echo "$curaccount:$curaccount" | sudo chpasswd
+    echo -e "${curaccount}\n${curaccount}" | sudo smbpasswd -a ${curaccount} -s
+
+    # echo "$curaccount:$curpasswd" | sudo chpasswd
+    sudo chmod 700 /home/$curaccount
+    sudo chfn $curaccount -f $curaccount -h "+86-20-82086168" -w $group_name -r "192 Kezhu Road"
+
+
+    #echo "CACHE_DIR=~/.ccache" >>/home/$curaccount/.profile
+    #echo "export USE_CCACHE=1" >>/home/$curaccount/.profile
+
+    #echo "if [ ! -d "~/.ccache" ] ; then" >>/home/$curaccount/.profile
+    #echo "    ccache -M 30GB" >>/home/$curaccount/.profile
+    #echo "fi" >>/home/$curaccount/.profile
+    
+    
+    
+
+    # sudo chage -d 0 $curaccount
+    # echo "123456" | sudo passwd --stdin $curaccount
+}
+
+function _addUser()
+{
+    curaccount=$1
+    ifexist=`cat /etc/passwd | grep "${curaccount}:" | awk -F : "{print \\$1}" `
+    if [ "$ifexist" == "$curaccount" ] ;
+    then
+        echo -e "\033[31;1m   -->USER:$curaccount already exists!Reset the validity period.\033[0m"
+        _setUserInfo ${curaccount}
+    else
+        sudo useradd -m -b /home/$curaccount -d /home/$curaccount -g $group_name -s $shell  $curaccount
+        _setUserInfo ${curaccount}
+        echo -e "\033[32;1m   -->add user:$curaccount ...\033[0m"
+    fi
+}
+
+function _delUser()
+{
+    curaccount=$1
+
+    sudo smbpasswd -x ${curaccount}
+
+    ifexist=`cat /etc/passwd | grep "${curaccount}:" | awk -F : "{print \\$1}" `
+    if [ "$ifexist" == "$curaccount" ]
+    then
+        sudo userdel -r $curaccount
+        echo -e "\033[32;1m   -->delete user:$curaccount ...\033[0m"
+    else
+        echo -e "\033[31;1m   -->user:$curaccount does not exists!\033[0m"
+    fi
+}
+
+
+vi=0;
+for userlist in "$@"; do
+    if [ $vi == 0 ]; then
+        vi=1;
+    else
+        if [ ${imode} == 1 ] ; then
+            echo "1.--> add users $userlist...";
+            _addUser $userlist ;
+        else
+            echo "2.--> del users $userlist...";
+            _delUser $userlist ;
+        fi;
+    fi;
+done
+
+echo "***********************the operator has been finished!***************"
+
+

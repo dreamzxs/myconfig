@@ -1,0 +1,30 @@
+#!/bin/sh
+CUR_PATH=`pwd`
+TMP_LOG=$CUR_PATH/.tmplog
+
+while getopts :n:s:ngz OPT
+do
+   case $OPT in
+       n)   LOG_NUM="$OPTARG";;
+       s)   FIND_STR="$OPTARG";;
+       ?)
+			echo "Like this: gitsearch -n 10 -s \"CVT_EN\" "
+            exit 1;;
+    esac
+done
+log=`git log -n $LOG_NUM --pretty="%h,%ai,%an"|tr ' ' '='`
+echo "Stat search $FIND_STR in git commit:"
+for i in $log
+do 
+	num=`echo $i|cut -d ',' -f1`
+	log_single=`echo $i|tr ',/=' ' '`
+    git show  ${num} > $TMP_LOG
+    if grep -q $FIND_STR $TMP_LOG ;then
+    	echo -e "commit:\033[32;40;1m$log_single\033[0m"
+    	grep --color  $FIND_STR  $TMP_LOG
+    fi
+    
+done
+rm $TMP_LOG
+echo "Search end."
+

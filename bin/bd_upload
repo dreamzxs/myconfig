@@ -1,0 +1,62 @@
+#!/bin/bash
+BPCS_PATH=~/bpcs_uploader
+BPCS_SCRIPT=$BPCS_PATH/bpcs_uploader.php
+DOWN_URL=http://tvreview.gz.cvte.cn/tools
+
+function help_info()
+{
+        echo  "*********************************************************"
+        echo  "Send file to baidu yun: bd_upload -u local_file_name"
+		echo  "Down file from baidu yun: bd_upload -d remote_file_name"
+        echo  "No permission: bd_upload -c init"
+        echo  "*********************************************************"
+        exit 1
+
+}
+
+function bpcs_install()
+{
+
+	if [ ! -d $BPCS_PATH ];then
+		echo  "*********************************************************"
+		echo  "auto install bpcs_uploader start ..."
+        
+		local BPCS_TOOL=bpcs_uploader.tgz
+		wget $DOWN_URL/$BPCS_TOOL
+		tar -xvzf $BPCS_TOOL -C ~/
+		rm $BPCS_TOOL
+		echo  "install bpcs_uploader success !!!"
+		echo  "*********************************************************"
+	fi
+}
+
+bpcs_install
+while getopts :u:d:c:z OPT
+do
+   case $OPT in
+    u)  
+		src_file="$OPTARG"
+		target_file=${src_file##*/}
+		echo "[upload]==$src_file==>$target_file"
+		$BPCS_SCRIPT upload $src_file $target_file
+	;;
+	d)
+		src_file="$OPTARG"
+                target_file=${src_file}
+                echo "[download]==$src_file==>$target_file"
+                $BPCS_SCRIPT download $src_file $target_file
+
+	;;
+    c)  
+		CMD="$OPTARG"
+		$BPCS_SCRIPT $CMD
+	;;
+    ?)  
+		help_info
+	;;
+    esac
+done
+if [ "$1"x == ""x ];then
+	help_info
+fi
+

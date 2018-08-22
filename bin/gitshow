@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#将该文件路径加入环境变量。 一般创建～/bin目录，  重启shell即可
+#cm-gitpatch commit
+
+#会将 commit 与 commit^ 差异代码导出到.../output/DATE-COMMIT-NAME 目录下
+#patch包会直接放置在.../output目录下
+
+
+
+if [ "$1"x != ""x ]; then
+	git difftool  $1 $1^ 
+fi
+

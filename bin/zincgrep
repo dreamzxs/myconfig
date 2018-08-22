@@ -1,0 +1,100 @@
+#!/bin/bash
+
+function fun_help()
+{
+    echo -e "zincgrep [options] keystring [path]"
+    echo -e "  find keystring in inc"
+    echo -e "  options:"
+    echo -e "     -w force keystring to match only whole words"
+    echo -e "     -i ignore case distinctions"
+    echo -e "     -v select non-matching lines"
+    echo -e "     -s show the run command"
+    echo -e "  eg:"
+    echo -e "  zincgrep chenming                  find \"chenming\" in current folder"
+    echo -e "  zincgrep chenming Supernva         find \"chenming\" in Supernova"
+    echo -e "  zincgrep -w chenming  Supernova    find \"chenming\" in Supernova match only whole words and case distinctions"
+    echo -e "  zincgrep -w -i chenming  Supernova find \"chenming\" in Supernova match only whole words and ignore case distinctions"
+}
+
+OPT_W=""
+# ignore case distinctions
+OPT_I="-i"
+# show line num
+OPT_N="-n"
+# show color
+OPT_C="--color"
+OPT_V=""
+OPT_EN_SHOW=FALSE
+
+while getopts :iwvsh OPT
+do
+   case $OPT in
+        w)  OPT_W="-w";;
+        i)  OPT_I="";;
+        v)  OPT_V="-v";;
+        s)  OPT_EN_SHOW="TRUE";;
+        h)
+            fun_help
+            exit 0
+            ;;
+        ?)
+            echo -en "\033[31;40;1m"
+            echo -e  "format error!!!"
+            fun_help
+            echo -e "\033[0m"
+            exit 1;;
+    esac
+done
+
+## fisrt para  --> keystring
+## second pare --> path
+LOCAL_KEYSTR=""
+LOCAL_PATH="."
+idx=1
+while [ $idx -le $# ]
+do
+    # echo ${!idx}
+    item="${!idx}"
+
+    if [ ${item:0:1} != "-" ]; then
+        if [ "$LOCAL_KEYSTR"x == ""x ]; then
+            LOCAL_KEYSTR=$item
+        else
+            LOCAL_PATH=$item
+            break
+        fi
+    fi
+
+    let idx+=1
+done
+
+if [ "$LOCAL_KEYSTR"x == ""x ]; then
+    echo -en "\033[31;40;1m"
+    echo -e  "keystring must't empty"
+    fun_help
+    echo -e "\033[0m"
+    exit 1
+fi
+
+# echo "$*"
+# echo "$#"
+# echo "OPT_W: ${OPT_W}"
+# echo "OPT_I: ${OPT_I}"
+# echo "OPT_N: ${OPT_N}"
+# echo "OPT_C: ${OPT_C}"
+# echo "OPT_V: ${OPT_V}"
+# echo "KEYSTR": ${LOCAL_KEYSTR}
+# echo "PATH"  : ${LOCAL_PATH}
+
+if test $OPT_EN_SHOW = "TRUE" ; then
+    echo -en "\033[32;40;1m"
+
+    echo "find ${LOCAL_PATH} ( -iname \"*.inc\" )"
+    echo "    | xargs grep ${OPT_W} ${OPT_I} ${OPT_C} ${OPT_N} ${OPT_V} \"${LOCAL_KEYSTR}\""
+
+    echo -e "\033[0m"
+fi
+
+find ${LOCAL_PATH} \( -iname '*.inc' \)  \
+    | xargs grep ${OPT_W} ${OPT_I} ${OPT_C} ${OPT_N} ${OPT_V} "${LOCAL_KEYSTR}"
+

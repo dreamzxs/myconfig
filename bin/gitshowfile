@@ -1,0 +1,12 @@
+#!/bin/sh
+arg=$*
+log=`git log ${arg} --pretty="%h,%ai,%an"|tr -d ' '`
+for i in $log
+do 
+		num=`echo $i|cut -d ',' -f1`
+		log_single=`echo $i|tr ','  '  '`
+    echo -e "commit:\033[32;40;1m$log_single\033[0m"
+    git show --stat ${num} |grep "|"
+    echo ""
+done
+

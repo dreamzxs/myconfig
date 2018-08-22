@@ -1,0 +1,10 @@
+#/bin/sh
+filelist=("customer" "factory" "user_setting")
+for file in ${filelist[@]}
+do
+	if [ -f $file".db" ];then
+		echo $file".db"
+		echo ".dump" | sqlite3 $file".db"  > $file".sql"
+	fi
+done
+

@@ -1,0 +1,195 @@
+# !/bin/sh
+
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2014 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________  ___________
+#     / / ________ \      / / _____   ____|| |  _______|
+#    / / /      \ \ \    / / /   | | |     | | |
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \_\_______|    \_\/        |_|_|     |_|_________|
+#
+################################################################################
+# descript:
+#######################
+# filename: commit_dialog
+# author  : chenming
+# date    : 2017-07-10
+# version : V1.0.0
+# note    :
+# =====================
+
+keyword_rst=~/.keyword_rst
+his_rst=~/.his_rst
+temp_history=~/temp_history
+
+
+current_log=~/current_log
+fixed_history=~/.fixed_history
+
+LINE_NUM=5
+
+logkeywords=("" "config" "feature" "bugfix" "merge" "revert");
+#################################
+
+function dialog_init()
+{
+	rm -f ${keyword_rst}
+	rm -f ${his_rst}
+	if [ ! -f ${fixed_history} ];then
+		touch ${fixed_history}
+	fi
+
+}
+
+
+function dialog_select_keyword()
+{
+	dialog --title "< git提交脚本 >" --no-mouse \
+	--menu "请选择关键字:" 14 32 8 \
+	1 "${logkeywords[1]}" \
+	2 "${logkeywords[2]}" \
+	3 "${logkeywords[3]}" \
+	4 "${logkeywords[4]}" \
+	5 "${logkeywords[5]}" \
+	10 "我是一个怀旧的脚本" 2>${keyword_rst}
+	RESULT_TEST=$?
+}
+
+function dialog_history_list()
+{
+	dialog --title "最近的10个feature或bugfix的log" --no-mouse --cancel-label "back" --menu "" 16 80 14 \
+	1  "$(sed -n $(($LINE_NUM*0+1))p  ${fixed_history})" \
+	2  "$(sed -n $(($LINE_NUM*1+1))p  ${fixed_history})" \
+	3  "$(sed -n $(($LINE_NUM*2+1))p  ${fixed_history})" \
+	4  "$(sed -n $(($LINE_NUM*3+1))p  ${fixed_history})" \
+	5  "$(sed -n $(($LINE_NUM*4+1))p  ${fixed_history})" \
+	6  "$(sed -n $(($LINE_NUM*5+1))p  ${fixed_history})" \
+	7  "$(sed -n $(($LINE_NUM*6+1))p  ${fixed_history})" \
+	8  "$(sed -n $(($LINE_NUM*7+1))p  ${fixed_history})" \
+	9  "$(sed -n $(($LINE_NUM*8+1))p  ${fixed_history})" \
+	10 "$(sed -n $(($LINE_NUM*9+1))p  ${fixed_history})" 2>${his_rst}
+	RESULT_TEST=$?
+
+	#echo "[${FUNCNAME[0]}]==>$RESULT_TEST"
+}
+
+function log_process()
+{
+	keyword=$1
+	
+		sed -i "1 s/\(.*\)/\[${keyword}\]\1/g" 	${current_log}
+		sed -i "2 s/\(.*\)/\[what\]\1/g" 		${current_log}
+		sed -i "3 s/\(.*\)/\[why\]\1/g" 		${current_log}
+		sed -i "4 s/\(.*\)/\[how\]\1/g" 		${current_log}
+		sed -i '1 G' 							${current_log}
+	if [ "${keyword}" == "feature" -o "${keyword}" == "bugfix" ];then
+		cat ${current_log} ${fixed_history} > ${temp_history}
+		mv ${temp_history} ${fixed_history}	
+		rm -f ${temp_history}
+		sed -i '51,$d' ${fixed_history} # LINE_NUM*10 + 1
+	fi
+}
+
+function log_check()
+{
+	keyword=$1
+	if [ "${keyword}" != "config" ];then
+		what_txt=$(sed -n 2p  ${current_log}|sed "s/\[what\]//"|tr [a-z] [A-Z])
+		why_txt=$(sed -n 3p  ${current_log}|sed "s/\[why\]//"|tr [a-z] [A-Z])
+		how_txt=$(sed -n 4p  ${current_log}|sed "s/\[how\]//"|tr [a-z] [A-Z])
+		if [[ "${what_txt}" == "无" ]]||[[ "NONE" =~ "${what_txt}" ]]||[[ "NULL" =~ "${what_txt}" ]]||\
+		   [[ "${why_txt}" == "无" ]]||[[ "NONE" =~ "${why_txt}" ]]||[[ "NULL" =~ "${why_txt}" ]]||\
+		   [[ "${how_txt}" == "无" ]]||[[ "NONE" =~ "${how_txt}" ]]||[[ "NULL" =~ "${how_txt}" ]];then 
+			dialog --infobox "  你的log不规范:\n what why how写清楚"  5  24 
+			echo "Your log:"
+			echo "=========================================================="
+			cat ${current_log}
+			echo "=========================================================="
+			exit 1;
+		fi
+	fi
+}
+
+
+function dialog_input_log()
+{
+	keyword=$1
+	if [ "${keyword}" == "config" ];then
+		filling="none"
+	else
+		filling=""
+	fi
+	dialog --title "请写清楚what why how" --no-mouse --form " " 12 80 4  \
+	  "[$keyword]" 1  1 "[][]"    1   10  60  0  \
+	  "[what]"     2  1 "$filling"  2   10  60  0  \
+	  "[why]"      3  1 "$filling"  3   10  60  0  \
+	  "[how]"      4  1 "$filling"  4   10  60  0 2> ${current_log}
+	  RESULT_TEST=$?
+	 if [ "${RESULT_TEST}" == "0" ];then
+	 	if [ -s ${current_log} ];then
+	 		log_check "${keyword}"
+	 		log_process "${keyword}"
+	 	fi
+	 else
+		echo "Note:user cancelled!"
+		exit 1;
+	 fi
+}
+
+function dialog_input_his()
+{
+	index=$1
+
+	keyword=$(sed -n $((${LINE_NUM}*${index}+1-${LINE_NUM}))p  ${fixed_history}|sed 's/\[\([a-z]\{5,\}\)\].*/\1/')
+	if [ "$keyword" == "" ];then
+		${0} #~/commit_dialog.sh
+	fi
+
+	keyword_txt=$(sed -n $((${LINE_NUM}*${index}+1-${LINE_NUM}))p  ${fixed_history}|sed "s/\[${keyword}\]//")
+	what_txt=$(sed -n $((${LINE_NUM}*${index}+3-${LINE_NUM}))p  ${fixed_history}|sed "s/\[what\]//")
+	why_txt=$(sed -n $((${LINE_NUM}*${index}+4-${LINE_NUM}))p  ${fixed_history}|sed "s/\[why\]//")
+	how_txt=$(sed -n $((${LINE_NUM}*${index}+5-${LINE_NUM}))p  ${fixed_history}|sed "s/\[how\]//")
+	dialog --title "请写清楚what why how" --no-mouse --form " " 12 80 4  \
+	  "[${keyword}]" 1  1 "${keyword_txt}"  1   10  60  0  \
+	  "[what]"       2  1 "${what_txt}"  	2   10  60  0  \
+	  "[why]"        3  1 "${why_txt}"  	3   10  60  0  \
+	  "[how]"        4  1 "${how_txt}"  	4   10  60  0  2> ${current_log}
+	  RESULT_TEST=$?
+	 if [ "${RESULT_TEST}" == "0" ];then
+	 	if [ -s ${current_log} ];then
+	 		log_check "${keyword}"
+	 		log_process "${keyword}"
+	 	fi
+	 else
+		echo "Note:user cancelled!"
+		exit 1; 	
+	 fi
+}
+
+
+# Enter
+dialog_init
+
+dialog_select_keyword
+if [ "${RESULT_TEST}" == "0" ];then
+	l_key=`cat ${keyword_rst}`
+	if [ "${l_key}" == "10" ];then
+		dialog_history_list
+		if [ "${RESULT_TEST}" == "0" ];then
+			his=`cat ${his_rst}`
+			dialog_input_his "${his}"
+		else
+			${0} #~/commit_dialog.sh
+		fi
+	else
+		dialog_input_log ${logkeywords[$l_key]}
+	fi
+else
+	echo "Note:user cancelled!"
+	exit 1;
+fi 
+

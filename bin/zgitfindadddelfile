@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# zgitfinddelfile
+
+CONST_AUTHOR=""
+CONST_COMMITTER=""
+CONST_START_TIME=""
+CONST_END_TIME=""
+CONST_BRANCHLISTS=""
+CONST_FILE=""
+CONST_EN_DEL=TRUE
+while getopts :s:e:c:a:b:f:dz OPT
+do
+   case $OPT in
+       s)  CONST_START_TIME="$OPTARG";;
+       e)  CONST_END_TIME="$OPTARG";;
+       c)  CONST_COMMITTER="$OPTARG";;
+       a)  CONST_AUTHOR="$OPTARG";;
+       b)  CONST_BRANCHLISTS="$OPTARG";;
+       f)  CONST_FILE="$OPTARG";;
+       d)  CONST_EN_DEL=FALSE;;
+       ?)  Usage
+            echo -en "\033[31;1m"
+            echo -e "format error!!!"
+            echo -em "eg: zgitfindadddelfile [-s 2013-12-10] [-e 2013-12-20] [-c committer] [-a author] [-b branch] [-f file] [-d]"
+            echo -e "\033[0m"
+            exit 1
+    esac
+done
+
+if [ "$CONST_BRANCHLISTS"x == "."x ]; then
+    CONST_BRANCHLISTS=""
+
+elif [ "$CONST_BRANCHLISTS"x != ""x ] ; then
+    echo "$CONST_BRANCHLISTS"
+
+else
+    for l_branch in $(git branch -a | cut -c2-)
+    do
+        #echo "${l_branch}"
+        str=$(echo ${l_branch} | grep "remotes/origin")
+
+        if [ "$str"x != ""x ];then
+            if [ "$(echo $str | grep "HEAD")"x == ""x ] ; then
+                CONST_BRANCHLISTS+="$str  "
+            fi
+        fi
+    done
+    #echo $BRANCHLISTS
+fi  # end if [ "$BRANCHLISTS"x == ""x ]
+
+
+if [ "${CONST_COMMITTER}"x != ""x ];then
+    g_committer="--committer=${CONST_COMMITTER}"
+else
+    g_committer=""
+fi
+
+if [ "${CONST_AUTHOR}"x != ""x ]; then
+    g_author="--author=${CONST_AUTHOR}"
+else
+    g_author=""
+fi
+
+if [ "${CONST_START_TIME}"x != ""x ];then
+    g_starttime="--after=${CONST_START_TIME}"
+else
+    g_starttime=""
+fi
+
+if [ "${CONST_END_TIME}"x != ""x ];then
+    g_endtime="--after=${CONST_END_TIME}"
+else
+    g_endtime=""
+fi
+
+
+function fun_find_file_from_commit()
+{
+    local l_pre_commit=""
+
+    for commit in $LOCAL_COMMIT_LIST
+    do
+        if [ "$l_pre_commit"x == ""x ]; then
+            l_pre_commit=$commit
+            continue
+        fi
+
+        #echo $l_pre_commit
+        local l_grep_str=""
+        if [ "$CONST_EN_DEL"x == "TRUE"x ]; then
+            l_grep_str="^D"
+        else
+            l_grep_str="^A"
+        fi
+
+        local l_str=""
+        if [ "$CONST_FILE"x == ""x ]; then
+            l_str=$(git diff --name-status  $l_pre_commit^..$l_pre_commit | grep $l_grep_str)
+        else
+            l_str=$(git diff --name-status  $l_pre_commit^..$l_pre_commit | grep $l_grep_str | grep "$CONST_FILE")
+        fi
+
+        if [ "$l_str"x != ""x ]; then
+            #echo "====commit: ${l_pre_commit} ===="
+            git log --format="%Cgreen%h %Cred[%ci] %Creset<%cn> %Creset  %Cgreen%s  %Creset"  $l_pre_commit -1
+            echo "$l_str"
+        fi
+
+        l_pre_commit=$commit
+    done
+}
+
+function fun_exe_find()
+{
+
+    if [ "$CONST_BRANCHLISTS"x == ""x ]; then
+        echo "====branch: ${branch}====="
+        LOCAL_COMMIT_LIST=$(git log --format="%h" ${g_committer} ${g_author} ${g_starttime} ${g_endtime} )
+        fun_find_file_from_commit
+        return
+    fi
+
+
+    for branch in $CONST_BRANCHLISTS
+    do
+        echo "====branch: ${branch}====="
+        LOCAL_COMMIT_LIST=$(git log --format="%h" ${g_committer} ${g_author} ${g_starttime} ${g_endtime} "${branch}")
+        fun_find_file_from_commit
+    done
+
+}
+
+
+fun_exe_find
+
+

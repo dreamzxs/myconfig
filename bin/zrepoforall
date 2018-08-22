@@ -1,0 +1,126 @@
+# !/bin/sh
+
+# zzrepoforall.sh
+
+CONST_ROOT_PATH=$(pwd)
+CONST_VERSION="1.1.0"
+
+
+CONST_CMD=""
+CONST_THE_PRJS=""
+CONST_MATCH_PART=""
+CONST_EN_FIND_EMPTY_BRANCH=FALSE
+CONST_EN_PRINT_PATH=TRUE
+
+while getopts :c:p:r:bhvz OPT
+do
+   case $OPT in
+       c)
+            CONST_CMD="$OPTARG"
+            ;;
+       p)
+            CONST_THE_PRJS="$OPTARG"
+            ;;
+       r)
+            CONST_MATCH_PART="$OPTARG"
+            ;;
+       b)
+            CONST_EN_FIND_EMPTY_BRANCH=TRUE
+            ;;
+       v)
+            echo "version: ${CONST_VERSION}"
+            exit 1;;
+       h)
+            echo -e "zrepoforall -b"
+            echo -e "zrepoforall -c cmd  [ -p prjs ] [ -r partpath ]"
+            echo -e "options:"
+            echo -e "   -h     show this help message and exit"
+            echo -e "   -b     find current branch empty (no branch) project. -b higer priority than -c"
+            echo -e "   -c     Command (and arguments) to execute"
+            echo -e "   -r     Execute the command only on projects path contain the parameter"
+            echo -e "   -p     Execute the command only on projects folder full match"
+            echo -e "   eg: zrepoforall -b"
+            echo -e "   eg: zrepoforall -c \"git branch\"  [ -p prjs ] [ -r partpath ]"
+            echo -e "   eg: zrepoforall -c \"git branch\"  [ -p customers ]"
+            echo -e "   eg: zrepoforall -c \"git branch\"  [ -r customers ]"
+            echo -e "   eg: zrepoforall -c \"git branch\"  [ -r \"cvte kernel\" ]"
+            exit 1;;
+       ?)  Usage
+            echo -en "\033[31;1m"
+            echo -e "format error!!"
+            echo -e "eg: zrepoforall -b"
+            echo -e "eg: zrepoforall -c \"git branch\"  [ -p prjs ] [ -r partpath ]"
+            echo -e "eg: zrepoforall -c \"git branch\"  [ -p customers ]"
+            echo -e "eg: zrepoforall -c \"git branch\"  [ -r customers ]"
+            echo -e "eg: zrepoforall -c \"git branch\"  [ -r \"cvte kernel\" ]"
+            echo -e "\033[0m"
+            exit 1;;
+    esac
+done
+
+
+if [ "$CONST_CMD"x == ""x ] && [ "$CONST_EN_FIND_EMPTY_BRANCH"x == "FALSE"x ];then
+    echo -en "\033[31;1m"
+    echo -e "format error!!"
+    echo -e "eg: zrepoforall -b"
+    echo -e "eg: zrepoforall -c \"git branch\"  [ -p prjs ] [ -r partpath ]"
+    echo -e "eg: zrepoforall -c \"git branch\"  [ -p customers ]"
+    echo -e "eg: zrepoforall -c \"git branch\"  [ -r customers ]"
+    echo -e "eg: zrepoforall -c \"git branch\"  [ -r \"cvte kernel\" ]"
+    echo -e "\033[0m"
+    exit 1
+fi
+
+function fun_analyse_no_branch()
+{
+    local l_repoinfo=$CONST_ROOT_PATH/zzprjspath.txt
+
+    repo info | grep "^Mount path" | cut -d":" -f2 | cut -c2- > $l_repoinfo
+
+    local l_tmp=""
+    local l_prj=""
+    for l_prj in $(cat $l_repoinfo)
+    do
+        if [ ! -d ${l_prj} ]; then
+            continue
+        fi
+
+        cd "${l_prj}"
+        l_tmp=$(git branch | grep "^\*" | cut -c3-)
+
+        if [ "${l_tmp}"x == "(no branch)"x ] ; then
+            echo "${l_prj}"
+            git branch
+        fi
+    done
+
+    rm -f $l_repoinfo
+}
+
+function fun_repo_command()
+{
+    if [ "$CONST_EN_FIND_EMPTY_BRANCH"x == "TRUE"x ]; then
+
+        fun_analyse_no_branch
+
+    else
+
+        local l_part_match=""
+        if [ "$CONST_MATCH_PART"x != ""x ]; then
+            l_part_match="-r ${CONST_MATCH_PART}"
+        fi
+
+        local l_the_prjs=""
+        if [ "$CONST_THE_PRJS"x != ""x ]; then
+            l_the_prjs="${CONST_THE_PRJS}"
+        fi
+
+        repo forall ${l_the_prjs} -p ${l_part_match} -c ${CONST_CMD}
+    fi
+
+}
+
+fun_repo_command
+
+cd $CONST_ROOT_PATH
+

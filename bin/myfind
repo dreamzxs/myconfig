@@ -1,0 +1,49 @@
+echo "p1:"$1
+echo "p2:"$2
+
+#if [ -z $3 ]
+if [ x"$3" == x ]
+then
+    dir="."
+else
+    dir=$3
+fi
+
+
+if [ "$2" = "c" ]; then
+    find  ${dir} -type f  \( -iname "*.c" -o -iname "*.h" -o -iname "*.cpp" \) -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "j" ]; then
+    find  ${dir} -type f  -iname "*.java" -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "d" ]; then
+    find  ${dir} -type d -iname "${1}"| grep $1 --color -s  
+elif  [ "$2" =  "f" ]; then
+    find  ${dir}  -iname "${1}"| grep $1 --color -s  
+elif  [ "$1" =  "cscope" ]; then
+    echo "--->gen files-list"
+    find  ${dir} -type f   \( -iname "*.c" -o -iname "*.h" -o -iname "*.cpp" -o -iname "*.mak" -o -iname "*.mk" -o -iname "makefile"  -o -iname "*.sh"   \) > ${dir}/cscope.files
+    echo "--->gen cscope.index"
+    cscope -bkq -i ${dir}/cscope.files
+    echo "--->gen tags.index"
+    ctags -R
+elif  [ "$2" =  "mc" ]; then
+    find  ${dir} -type f   \( -iname "*.c" -o -iname "*.h" -o -iname "*.cpp" -o -iname "*.mak" -o -iname "*.mk" -o -iname "makefile"  -o -iname "*.sh"   \)  -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "jx" ]; then
+    find  ${dir} -type f  \( -iname "*.xml" -o -iname "*.java" \) -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "mj" ]; then
+    find  ${dir} -type f  \( -iname "*.mak" -o -iname "*.mk" -o -iname "makefile"  -o -iname "*.sh"  -o -iname "*.java" \) -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "m" ]; then
+    find  ${dir} -type f  \( -iname "*.mak" -o -iname "*.mk" -o -iname "makefile"  -o -iname "makefile*"  -o -iname "*.sh"  \) -print |xargs grep -n  --color  "${1}" -s
+elif [ "$2" = "cal" ]; then
+    find  ${1} -type f  | grep -v ".git" | wc -l
+elif  [ "$2" =  "svn" ]; then
+    find  ${dir} -type f  \( -iname "svnaccess.*" -o -iname "*.conf" \) -print |xargs grep -n  --color  "${1}" -s
+elif  [ "$2" =  "delsvn" ]; then
+	echo "---> del:[$3]"
+    find . -type f  \( -iname "svnaccess.*" -o -iname "*.conf" \) -print | xargs sed -i "s/$3//g" 
+elif  [ "$2" =  ""all ]; then
+    find  ${dir} -type f   \( -iname "*.c" -o -iname "*.inl" -o -iname "*.h" -o -iname "*.cpp" -o -iname "*.mak" -o -iname "*.mk" -o -iname "makefile*" -o  -iname "makefile" -o -iname "*.sh"  -o -iname "*.java" \)  -print |xargs grep -n  --color  "${1}" -s
+elif [ ! -z $2 ] ; then
+    find  ${dir} -type f  -iname $2 -print |xargs grep -n  --color  "${1}" -s
+else # makefile
+    find  ${dir} -type f   \( -iname "*.c" -o -iname "*.inl" -o -iname "*.h" -o -iname "*.cpp" -o -iname "*.mak" -o -iname "*.mk" -o -iname "makefile*" -o  -iname "makefile" -o -iname "*.sh"  -o -iname "*.java" \)  -print |xargs grep -n  --color  "${1}" -s
+fi  

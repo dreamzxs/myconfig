@@ -1,0 +1,52 @@
+#!/bin/bash
+
+#jdk version setting
+export JAVA_HOME=/usr/lib/jvm/jdk1.8.0_111
+export JRE_HOME=${JAVA_HOME}/jre
+export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib
+export PATH={JAVA_HOME}/bin:$PATH
+
+#add sonar-scanner path
+export PATH=$PATH:/opt/sonar-scanner-2.8/bin
+
+#agrs
+EN_SONAR_PREVIEW=false
+PROJECT_NAME="Manual_Test"
+CSC_SRC_PATH=""
+SONAR_SRC_PATH=""
+#parse args
+for arg in $*
+do
+   if [[ "$arg"x == "--html"x ]];then
+        EN_SONAR_PREVIEW=true
+   else
+        CSC_SRC_PATH="${arg} ${CSC_SRC_PATH}"
+        SONAR_SRC_PATH="${arg},${SONAR_SRC_PATH}"
+   fi
+done
+
+
+CscanCode -j 4  --xml --writefile=issue-csc-report.xml --configpath=/etc/CscanCodeConfig $CSC_SRC_PATH 
+if [ $? -ne 0 ];then
+    echo "Parse source code failed!"
+    rm -rf check_time.log total_time.log tokenize_time.log 
+    exit 1
+fi
+
+#sonar-project.properties param
+if [ "$EN_SONAR_PREVIEW"x == "true"x ];then
+    sonar-scanner -e -Dsonar.host.url=http://172.17.84.185:9090 -Dsonar.projectKey=${PROJECT_NAME} -Dsonar.projectName=${PROJECT_NAME} -Dsonar.projectVersion=0.1 -Dsonar.sourceEncoding=UTF-8 -Dsonar.language=c++ -Dsonar.sources=${SONAR_SRC_PATH} -Dsonar.cxx.cppcheck.reportPath=./issue-csc-report.xml -Dsonar.analysis.mode=preview -Dsonar.issuesReport.html.enable=true -Dsonar.issuesReport.console.enable=true 
+    if [ $? -ne 0 ];then
+    	exit 1
+        rm -rf check_time.log total_time.log tokenize_time.log .sonar issues-report
+    fi
+
+    #tar html file
+    cp -r .sonar/issues-report  .
+    rm -f issue-html-report.tar
+    tar -cvf issue-html-report.tar  issues-report > /dev/null
+fi
+
+#clean
+rm -rf check_time.log total_time.log tokenize_time.log .sonar issues-report
+

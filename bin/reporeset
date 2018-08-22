@@ -1,0 +1,99 @@
+#!/bin/sh
+
+
+###########################################################################################
+#
+# file name:    reporeset
+# author:	luojie
+# date: 	2016-06-15
+# descript:	reset repo to a time point  
+#  
+###########################################################################################
+
+TIME_POINT=$1
+CUR_PATH=$PWD
+function Msg_Warning()
+{
+	echo -en "\033[0;32;1m"	
+	echo -e "********************************************"
+	for i in "$@"
+	do
+		echo $i
+	done
+	echo -en "********************************************"
+	echo -e "\033[0m"
+}
+function Msg_Warning_short()
+{
+	echo -en "\033[0;32;1m"	
+	echo -en $1
+	echo -e "\033[0m"
+
+}
+function Msg_Error()
+{
+	echo -en "\033[0;31;1m"	
+	echo -e "********************************************"
+	for i in "$@"
+	do
+		echo $i
+	done
+	echo -en "********************************************"
+	echo -e "\033[0m"
+}
+function Msg_Error_short()
+{
+	echo -en "\033[0;31;1m"	
+	echo -en $1
+	echo -e "\033[0m"
+
+}
+function inputCheck()
+{
+	if [ -z "$TIME_POINT" ];then
+		Msg_Warning "please add a TIME_STRING like \"2016.07.08 01:23:45\" "
+		exit 1;
+	else
+		echo $TIME_POINT|grep -e "[0-9]\{4\}\.[0-9]\{2\}\.[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}"
+		if [ $? -ne 0 ]; then
+		Msg_Error_short "Error:TIME_STRING format is not match,pls like \"2016.07.08 01:23:45\""
+		exit 1;
+		fi
+	fi
+	if [ ! -d $CUR_PATH/.repo ];then
+		Msg_Warning "You must under the root path of a repo dir"
+		exit 1;
+	fi
+	Msg_Warning " Y/y:reset hard to the time you want " " N/n:just show log at the time point"
+	echo "please select you want: "
+	read temp
+	if [ "$temp" != "Y" ]&&[ "$temp" != "y" ]&&[ "$temp" != "N" ]&&[ "$temp" != "n" ];then
+		Msg_Warning "Error:no \"$temp\" cmd for use. Good Bye!"
+		exit 1;
+	fi
+}
+function repo_reset()
+{
+	for i in `repo list|cut -d ':' -f1`
+	do
+		local_path=$PWD/$i
+		pushd $local_path > /dev/null 2>&1
+		echo "===>$local_path:"
+		
+		if [ "$temp" = "Y" ]||[ "$temp" = "y" ];then
+			local_ver=`git log --oneline -n 1  --until "$TIME_POINT" |awk '{print $1}'`
+			git reset --hard $local_ver
+			if [ $? -ne 0 ]; then
+	      		Msg_Error_short "reset fail!"
+		    else	
+		        Msg_Warning_short "reset OK!"
+		    fi
+		elif [ "$temp" = "N" ]||[ "$temp" = "n" ];then
+			git gl  -n 1  --until "$TIME_POINT"
+		fi
+		popd > /dev/null 2>&1
+	done
+}
+
+inputCheck
+repo_reset

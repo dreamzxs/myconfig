@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#将该文件路径加入环境变量。 一般创建～/bin目录，  重启shell即可
+#cm-gitpatch commit
+
+#会将 commit 与 commit^ 差异代码导出到.../output/DATE-COMMIT-NAME 目录下
+#patch包会直接放置在.../output目录下
+
+OUTDIR=output
+COMMIT=$(git log $1 -1 --pretty=format:"%h")
+DATE=$(git log $1 -1 --pretty=format:"%ci" | cut -c6,7,9,10,12,13,15,16 )
+NAME=$(git log $1 -1 --pretty=format:"%cn" )
+
+if [ ! -d output ] ;then 
+	mkdir $OUTDIR
+fi
+
+PATCHNAME=$(echo "$DATE-$COMMIT-$NAME" | sed "s/ /_/g")
+
+if [ ! -d $OUTDIR/$PATCHNAME ] ; then
+	mkdir $OUTDIR/$PATCHNAME
+else
+	rm -rf $OUTDIR/$PATCHNAME/*
+fi
+
+if [ -f $OUTDIR/$PATCHNAME.patch ] ; then
+	rm -rf $OUTDIR/$PATCHNAME.patch
+fi
+
+git format-patch -1 $1
+mv 000*.patch $OUTDIR/$PATCHNAME.patch
+
+echo -e "========$PATCHNAME=================\n\n" > $OUTDIR/$PATCHNAME/$PATCHNAME.log
+git show $1 --stat >> $OUTDIR/$PATCHNAME/$PATCHNAME.log
+
+
+##$(git diff --name-status $1^..$1 | grep 'D[[:space:]]' | cut -c3-)
+#提取所有文件
+
+#前一版文件   不包含新加文件, 即为前一版包含的文件
+PREFILES=$(git diff --name-status $1^..$1 | grep -v 'A[[:space:]]' | cut -c3- )
+#当前版文件   已经删除的不被包含
+CURFILES=$(git diff --name-status $1^..$1 | grep -v 'D[[:space:]]' | cut -c3- )
+#分析标记为delete的文件
+
+if [ "$CURFILES"x != ""x ]; then
+    echo "$OUTDIR/$PATCHNAME/$PATCHNAME-cur.zip"
+    git archive -o $OUTDIR/$PATCHNAME/$PATCHNAME-cur.zip $1 $CURFILES
+    #echo $CURFILES
+fi
+
+if [ "$PREFILES"x != ""x ]; then
+    echo "$OUTDIR/$PATCHNAME/$PATCHNAME-pre.zip"
+    git archive -o $OUTDIR/$PATCHNAME/$PATCHNAME-pre.zip $1^ $PREFILES
+    #echo $PREFILES
+fi

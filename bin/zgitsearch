@@ -1,0 +1,294 @@
+#!/bin/bash
+
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2014 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________  ___________
+#     / / ________ \      / / _____   ____|| |  _______|
+#    / / /      \ \ \    / / /   | | |     | | |
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \_\_______|    \_\/        |_|_|     |_|_________|
+#
+################################################################################
+# descript:
+#######################
+# filename: zgitsearch
+# author  : chenming
+# date    : 2014-12-05
+# version : V1.0.0
+# note    :
+# =====================
+# auther  : chenming
+# date    : 2015-08-05
+# modify  : 脚本结构调整, 严格检查参数
+# version : V1.1.0
+# note    :
+#
+################################################################################
+#zgitsearch [-k string] [-s 2013-12-10] [-e 2013-12-20] [-c committer] [-b branch] [-n showline]
+################################################################################
+CONST_VERSION="1.1.0"
+CONST_ROOT_PATH=$(pwd)
+
+CONST_START_TIME=""
+CONST_END_TIME=""
+CONST_COMMITTER=""
+CONST_AUTHOR=""
+CONST_BRANCHLISTS=""
+CONST_KEYSTR=""
+CONST_SHOWNUM=""
+
+while getopts :s:e:c:a:b:k:n:vz OPT
+do
+   case $OPT in
+       s)  CONST_START_TIME="$OPTARG";;
+       e)  CONST_END_TIME="$OPTARG";;
+       c)  CONST_COMMITTER="$OPTARG";;
+       a)  CONST_AUTHOR="$OPTARG";;
+       b)  CONST_BRANCHLISTS="$OPTARG";;
+       k)  CONST_KEYSTR="$OPTARG";;
+       n)  CONST_SHOWNUM="$OPTARG";;
+       v)
+            echo "version: ${CONST_VERSION}"
+            exit 0;;
+       ?)  Usage
+            echo -e "\033[31;40;1m format error!!! \033[0m"
+            echo -en "\033[31;40;1m eg: zgitsearch [-k \"string\"]\033[0m"
+            echo -en "\033[31;40;1m [-s 2013-12-10] [-e 2013-12-20] [-c committer]\033[0m"
+            echo -e "\033[31;40;1m [-a author] [-b branch] [-n showline]\033[0m"
+            exit 1;;
+    esac
+done
+
+##缺省设置变量
+g_starttime=""
+g_endtime=""
+g_keystr=""
+g_committer=""
+g_author=""
+g_shownum=""
+RET_PARA=""
+
+function step1_check_BranchLists()
+{
+    local fun_ret=0
+    ## 当前分支
+    if [ "$CONST_BRANCHLISTS"x == "."x ]; then
+        CONST_BRANCHLISTS=$(git branch | grep "*" | cut -c3- )
+    fi
+
+    if [ "$CONST_BRANCHLISTS"x == ""x ] ; then
+
+        allbranchs=$(git branch -a | cut -c2-)
+        # echo ${allbranchs}
+
+        for l_branch in ${allbranchs}
+        do
+            #echo "${l_branch}"
+            str=$(echo ${l_branch} | grep "remotes")
+            # echo "---:${str}:---"
+
+            if [ "$str"x != ""x ];then
+                ## 过滤链接
+                if [ "$(echo $str | grep "/m/")"x == ""x ] ; then
+                    CONST_BRANCHLISTS+="$str  "
+                fi
+            fi
+        done
+        # echo $CONST_BRANCHLISTS
+
+    fi
+
+    return $fun_ret
+}
+
+function step1_check_Time()
+{
+    local fun_ret=0
+
+    function foramt_time()
+    {
+        local thetime=$1
+        local fun_ret=0
+
+        y=$(echo $thetime | cut -d"-" -f1)
+        m=$(echo $thetime | cut -d"-" -f2)
+        d=$(echo $thetime | cut -d"-" -f3)
+
+        if [ $y -lt 2012 ]; then
+            fun_ret=1
+        fi
+        RET_PARA=$(date -d "${y}-${m}-${d} 00:00:00" +%F)
+        if [ $? -ne 0 ]; then
+            fun_ret=1
+            RET_PARA=""
+        fi
+
+        return $fun_ret
+    }
+
+    if [ "${CONST_START_TIME}"x != ""x ];then
+        foramt_time ${CONST_START_TIME}
+        if [ $? -ne 0 ]; then
+            fun_ret=1
+            echo -e "\033[31;40;1m start time format error: -s ${CONST_START_TIME}\033[0m"
+            echo -e "\033[31;40;1m eg: -s 2015-05-07 \033[0m"
+            g_starttime=""
+        else
+            g_starttime="--after=${RET_PARA}"
+        fi
+
+    else
+        g_starttime=""
+    fi
+
+    if [ "${CONST_END_TIME}"x != ""x ];then
+        foramt_time ${CONST_END_TIME}
+        if [ $? -ne 0 ]; then
+            fun_ret=1
+            echo -e "\033[31;40;1m end time format error: -e ${CONST_END_TIME}\033[0m"
+            echo -e "\033[31;40;1m eg: -e 2015-05-07 \033[0m"
+            g_endtime=""
+        else
+            g_endtime="--before=${RET_PARA}"
+        fi
+
+    else
+        g_endtime=""
+    fi
+
+    return $fun_ret
+}
+
+function step1_check_others()
+{
+    local fun_ret=0
+
+    if [ "${CONST_KEYSTR}"x != ""x ];then
+        g_keystr=${CONST_KEYSTR}
+    else
+        g_keystr=""
+    fi
+
+    if [ "${CONST_COMMITTER}"x != ""x ];then
+        g_committer="--committer=${CONST_COMMITTER}"
+    else
+        g_committer=""
+    fi
+
+    if [ "${CONST_AUTHOR}"x != ""x ]; then
+        g_author="--author=${CONST_AUTHOR}"
+    else
+        g_author=""
+    fi
+
+    if [ "${CONST_SHOWNUM}"x != ""x ];then
+
+        g_shownum=$(echo $CONST_SHOWNUM | sed 's/[0-9]//g')
+        if [ "$g_shownum"x != ""x ]; then
+            fun_ret=1
+            echo -e "\033[31;40;1m show line num error: ${CONST_SHOWNUM}\033[0m"
+            echo -e "\033[31;40;1m eg: -n 10 \033[0m"
+            g_shownum=""
+        else
+            g_shownum="-${CONST_SHOWNUM}"
+        fi
+    else
+        g_shownum=""
+    fi
+
+    return $fun_ret
+}
+
+function step2_check_empty()
+{
+    local fun_ret=1
+    if [ "${g_keystr}"x != ""x ] ; then
+        fun_ret=0
+    fi
+    if [ "${g_committer}"x != ""x ] ; then
+        fun_ret=0
+    fi
+    if [ "${g_author}"x != ""x ] ; then
+        fun_ret=0
+    fi
+    if [ "${g_starttime}"x != ""x ] ; then
+        fun_ret=0
+    fi
+    if [ "${g_endtime}"x != ""x ] ; then
+        fun_ret=0
+    fi
+    if [ "${g_shownum}"x != ""x ] ; then
+        fun_ret=0
+    fi
+
+    if [ $fun_ret -ne 0 ]; then
+        echo -e "\033[31;40;1m must set one parameter  \033[0m"
+        echo -en "\033[31;40;1m eg: [-k \"string\"] [-s 2013-12-10] [-e 2013-12-20]\033[0m"
+        echo -e "\033[31;40;1m [-c committer] [-a author] [-b branch] [-n showline]\033[0m"
+    fi
+
+    return $fun_ret
+}
+
+ret=0
+step1_check_BranchLists
+if [ $? -ne 0 ]; then
+    ret=1
+fi
+step1_check_Time
+if [ $? -ne 0 ]; then
+    ret=1
+fi
+step1_check_others
+if [ $? -ne 0 ]; then
+    ret=1
+fi
+if [ $ret -ne 0 ]; then
+    exit 1
+fi
+
+step2_check_empty
+if [ $? -ne 0 ]; then
+    ret=1
+fi
+
+if [ $ret -ne 0 ]; then
+    exit 1
+fi
+
+function run_exe()
+{
+    local fun_ret=0
+
+    if [ "${g_keystr}"x != ""x ]; then
+        echo -en "\033[32;40;1m git gl2\033[0m"
+        echo -en "\033[32;40;1m ${g_committer} ${g_author} ${g_starttime} ${g_endtime} ${g_shownum}\033[0m"
+        echo -e "\033[32;40;1m | grep -i \"${g_keystr}\"\033[0m"
+    else
+        echo -en "\033[32;40;1m git gl2\033[0m"
+        echo -e "\033[32;40;1m ${g_committer} ${g_author} ${g_starttime} ${g_endtime} ${g_shownum}\033[0m"
+    fi
+
+    for g_branch in $CONST_BRANCHLISTS
+    do
+        echo "----------------:${g_branch}:----------------"
+        if [ "${g_keystr}"x != ""x ]; then
+            git log --format="%Cgreen%H %Cred[%ci] %Creset<%cn> %Creset  %Cgreen%s  %Creset"  \
+                    ${g_committer} ${g_author} ${g_starttime} ${g_endtime} ${g_shownum} \
+                    "${g_branch}"  | grep -i "${g_keystr}"
+        else
+            git log --format="%Cgreen%H %Cred[%ci] %Creset<%cn> %Creset  %Cgreen%s  %Creset"  \
+                    ${g_committer} ${g_author} ${g_starttime} ${g_endtime} ${g_shownum} \
+                    "${g_branch}"
+        fi
+    done
+
+    return $fun_ret
+}
+
+run_exe
+

@@ -1,0 +1,107 @@
+#!/bin/sh
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2016 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________   __________
+#     / / ________ \      / / _____   ____| /|  _______|
+#    / / /_______/\ \    / / /___/ | |___/ | | |______/
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |______/
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \ \_______|    \ \/        | |_|     | |_________|
+#      \/______/      \/         |/_/      |/_________/ 
+################################################################################
+# descript:
+#######################
+# author  : luojie
+# date    : 2017-08-04
+# note    : 
+################################################################################
+COMMIT_IN=$1
+PARAM_NO=$#
+newlog=""
+readonly COLOR_ERROR=31     #red
+readonly COLOR_INFO=32      #green
+readonly COLOR_WARNING=33   #yellow
+GIT_PATH=$PWD/.git
+
+
+function msg_split()
+{
+   local str=$(printf "%-60s" "*")
+   echo "${str// /*}"
+}
+
+function msg_show()
+{
+	color_num=$1
+    printf "\033[${color_num};1m"
+    msg_split
+    while [ "$#" -gt "1" ];do
+        shift
+        echo "$1"
+    done
+    msg_split
+    printf "\033[0m"
+}
+
+################################################################################
+function use_help()
+{
+	msg_show ${COLOR_ERROR} "Error(cvt): param can only one " \
+						"like: git cvt-revert 91c9ac8 "
+	exit 0;
+}
+
+function logmerge()
+{
+	logbody="$(git log ${COMMIT_IN} -n 1 --format="%B")"
+	if [ $? -eq 0 ];then
+		newlog=$(echo "[revert][base@${COMMIT_IN:0:9}]${logbody}")
+	else
+		msg_show ${COLOR_ERROR} "Error(cvt): can not get the commit info from ${COMMIT_IN}"
+		exit 0
+	fi
+	#echo "<$newlog>"
+}
+
+function revert()
+{
+	git revert ${COMMIT_IN} -n
+	if [ $? -eq 0 ];then
+		git commit -m "${newlog}"
+	else
+		echo "${newlog}" > ${GIT_PATH}/MERGE_MSG
+		msg_show ${COLOR_WARNING} "Error(cvt): revert failed on ${COMMIT_IN}" \
+								   "After resolved conflicts" \
+								   "you can use: git rvt --continue or git commit"
+		exit 0
+	fi
+}
+
+function git_para_check()
+{
+	if [ ! -d ${GIT_PATH} ];then
+		msg_show ${COLOR_ERROR} "Error(cvt): Not a git repository"
+		exit 0;
+	fi
+	if [ "${PARAM_NO}" -ne "1" ];then
+		use_help
+	fi
+	if [ ${COMMIT_IN} == "--continue" ];then
+		git commit -F ${GIT_PATH}/MERGE_MSG
+	else
+		echo "${COMMIT_IN}"|grep -q "^[0-9a-z]\{7,\}$"
+		if [ $? -eq 0 ];then
+			logmerge
+			revert
+		else
+			msg_show ${COLOR_ERROR} "Error(cvt): commit must be error!"
+			exit 0;
+		fi
+	fi
+
+
+}
+git_para_check

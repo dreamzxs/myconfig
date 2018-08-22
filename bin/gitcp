@@ -1,0 +1,216 @@
+#!/bin/sh
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2016 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________   __________
+#     / / ________ \      / / _____   ____| /|  _______|
+#    / / /_______/\ \    / / /___/ | |___/ | | |______/
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |______/
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \ \_______|    \ \/        | |_|     | |_________|
+#      \/______/      \/         |/_/      |/_________/ 
+################################################################################
+# descript:
+#######################
+# author  : luojie
+# date    : 2017-08-04
+# note    : 
+################################################################################
+COMMIT_IN=$1
+PARAM_NO=$#
+newlog=""
+commit_list=""
+readonly COLOR_ERROR=31     #red
+readonly COLOR_INFO=32      #green
+readonly COLOR_WARNING=33   #yellow
+GIT_PATH=$PWD/.git
+COMMIT_SEQ=${GIT_PATH}/COMMIT_CP_SEQ_LIST
+COMMIT_CONFLICT=COMMIT_CP_CONFLICT_LOG
+
+function msg_split()
+{
+   local str=$(printf "%-60s" "*")
+   echo "${str// /*}"
+}
+
+function msg_show()
+{
+	color_num=$1
+    printf "\033[${color_num};1m"
+    msg_split
+    while [ "$#" -gt "1" ];do
+        shift
+        echo "$1"
+    done
+    msg_split
+    printf "\033[0m"
+}
+
+################################################################################
+function use_help()
+{
+	msg_show ${COLOR_ERROR} "Error(cvt): param can only one " \
+						"single like: git cvt-cp 91c9ac8 " \
+						"multi  like: git cvt-cp 91c9ac8^..d4a214c" \
+						"git cvt-cp --continue for continue" \
+						"git cvt-cp --quit for clear trash " 
+	exit 0;
+}
+
+
+function cherrypick_quit()
+{
+	rm -f ${GIT_PATH}/COMMIT_CP_*
+	exit 0
+}
+
+
+function get_commit_list()
+{
+	if [ -f ${COMMIT_SEQ} ];then
+		msg_show ${COLOR_WARNING} "Warning(cvt): there have cherr-pick list not finish" \
+								  "Warning(cvt): Your can use: git cvt-cp --continue for continue" \
+								  "Warning(cvt): Your can use: git cvt-cp --quit for give up" 
+	fi
+	echo "${COMMIT_IN}"|grep -q "^[0-9a-z]\{7,\}$"
+	if [ $? -eq 0 ];then
+		#echo "single commit"
+		commit_list=${COMMIT_IN}
+		echo "${commit_list}"> ${COMMIT_SEQ}
+	else
+		echo "${COMMIT_IN}"|grep -q "^[0-9a-z]\{7,\}[\^]\{0,1\}\.\.[0-9a-z]\{7,\}$" 
+		if [ $? -eq 0 ];then
+			#echo "multi commit"
+			commit_list=$(git log --format="%h" --reverse ${COMMIT_IN})
+			echo "${commit_list}"> ${COMMIT_SEQ}
+		else
+			use_help
+		fi
+	fi
+}
+
+function get_continue_list()
+{
+	if [ -f ${COMMIT_SEQ} ];then
+		if [ -f ${GIT_PATH}/CHERRY_PICK_HEAD ];then
+			local tmp_nu=$(find ${GIT_PATH} -type f -name "$COMMIT_CONFLICT*"|wc -l)
+			if [ "${tmp_nu}" != "1" ];then
+				msg_show ${COLOR_ERROR} "Error(cvt): there have more than one commit failed!"
+				exit 0
+			fi
+			git commit -F ${GIT_PATH}/${COMMIT_CONFLICT}_*
+			if [ $? -ne 0 ];then
+				exit 0
+			fi
+			local cur_seq=$(cat ${COMMIT_SEQ}|head -n 1)
+			local old_cmt=$(ls ${GIT_PATH}/${COMMIT_CONFLICT}_*|awk -F '_' '{print $NF}')
+			#echo "==>[$cur_seq]  [$old_cmt]"
+			if [ "$cur_seq" == "$old_cmt" ];then
+				sed -i '1d' ${COMMIT_SEQ}
+				commit_list=$(cat ${COMMIT_SEQ})
+				if [ ! -s ${COMMIT_SEQ} ];then
+					rm -f ${COMMIT_SEQ}
+				fi 
+				rm -f ${GIT_PATH}/${COMMIT_CONFLICT}_*
+			else
+				msg_show ${COLOR_ERROR} "Error(cvt): Your cherry-pick ${cmt_version}" \
+										"Error(cvt): The continue commit is ${cur_seq}" \
+										"Error(cvt): It must be conflicts!"
+				cherrypick_quit
+			fi
+		fi
+
+	else
+		msg_show ${COLOR_ERROR} "Error(cvt): can not find cherry-pick history"
+		exit 0
+	fi
+}
+
+
+function logmerge()
+{
+	local cmt_version=$1
+	logbody="$(git log ${cmt_version} -n 1 --format="%B")"
+	keyword=$(echo ${logbody}|head -n 1|sed 's/\(\[[a-z]\{5,\}\]\).*/\1/')
+	if [ "${keyword}" != "[merge]" ];then
+		newlog=$(echo "[merge][cp-from@${cmt_version:0:9}]${logbody}")
+	else
+		newlog=$(echo "${logbody}")
+	fi
+	#echo "<$keyword>"
+	#echo "<$newlog>"
+}
+
+function cherrypick()
+{
+	local cmt_version=$1
+	git cherry-pick ${cmt_version}
+	if [ $? -eq 0 ];then
+		git commit --amend -m "${newlog}"
+		if [ -f ${COMMIT_SEQ} ];then
+			local cur_seq=$(cat ${COMMIT_SEQ}|head -n 1)
+			if [ "$cur_seq" == "$cmt_version" ];then
+				sed -i '1d' ${COMMIT_SEQ}
+				if [ ! -s ${COMMIT_SEQ} ];then
+					rm -f ${COMMIT_SEQ}
+				fi 
+			else
+				msg_show ${COLOR_ERROR} "Error(cvt): Your cherry-pick $cmt_version" \
+										"Error(cvt): The continue commit is $cur_seq" \
+										"Error(cvt): it must be conflicts!"
+				rm -f ${COMMIT_SEQ}
+				exit 0
+			fi
+			
+		fi 	
+	else
+		if [ -f "${GIT_PATH}/CHERRY_PICK_HEAD" ];then
+			local pick_head=$(cat ${GIT_PATH}/CHERRY_PICK_HEAD)
+			if [[ "${pick_head}"  =~  "${cmt_version}" ]];then
+				echo "${newlog}" > ${GIT_PATH}/MERGE_MSG
+				rm -f ${GIT_PATH}/${COMMIT_CONFLICT}_*
+				cp -f  ${GIT_PATH}/MERGE_MSG  ${GIT_PATH}/${COMMIT_CONFLICT}_${cmt_version}
+			fi
+		fi
+		exit 0
+	fi
+}
+
+function loop_cherrypick()
+{
+	if [ ! -z "${commit_list}" ];then
+		for i in ${commit_list}
+		do
+			msg_show ${COLOR_INFO} "start cherrypick $i"
+			logmerge $i 
+			cherrypick $i 
+		done
+	else
+		msg_show ${COLOR_ERROR} "Error(cvt): can not get commit version!"
+	fi
+}
+
+
+function git_para_check()
+{
+	if [ ! -d ${GIT_PATH} ];then
+		msg_show ${COLOR_ERROR} "Error(cvt): Not a git repository"
+		exit 0;
+	fi
+	if [ "${PARAM_NO}" -ne "1" ];then
+		use_help
+	fi
+	if [ ${COMMIT_IN} == "--continue" ];then
+		get_continue_list
+	elif [ ${COMMIT_IN} == "--quit" ];then
+		cherrypick_quit
+	else
+		get_commit_list
+		loop_cherrypick
+	fi
+}
+
+git_para_check
+

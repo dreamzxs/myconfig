@@ -1,0 +1,51 @@
+#!/bin/bash
+repo list>/dev/null
+if [ $? -ne 0 ];then
+	echo "there is not a repo project!"
+	exit 1;
+fi 
+
+while true
+do
+	if [ -d .repo ];then
+		cd .repo/manifests > /dev/null
+		manifest_url=$(git remote -v|grep 'fetch'|awk '{printf $2}')
+		manifest_br=$(repo info|grep "Manifest branch:"|cut -d':' -f2|tr -d ' ') 
+		cd - > /dev/null
+		break
+	fi
+	cd ../ > /dev/null
+done
+
+if [ -z ${manifest_url} ];then
+	exit 1
+fi
+
+if [[ ${manifest_url} =~ "git.gz.cvte.cn/" ]];then
+	tmp=${manifest_url#*git.gz.cvte.cn/}
+elif [[ ${manifest_url} =~ "git.gz.cvte.cn:/" ]];then
+	tmp=${manifest_url#*git.gz.cvte.cn:/}
+else
+	exit 1
+fi
+ 
+#first word string
+word1="${tmp%%/*}"
+#second word string
+tmp="${tmp##*${word1}\/}"
+word2="${tmp%%/*}"
+filename=${word1}#${word2}-${manifest_br}
+
+:> ./$filename
+for i in $(repo list | tr -d ' ')
+do
+	proj=`echo $i|cut -d ':' -f1` 
+	cd $proj > /dev/null
+	AA=$(git remote -v|grep 'fetch'|awk '{printf "%s:", $2}')
+	BB=$(git branch|grep '*'|cut -d' ' -f 2)
+	cd - >/dev/null
+	echo ${AA}${BB} >> ./$filename 
+done
+
+scp ./$filename jenkins@172.17.84.185:/var/www/branch_info/
+rm -f ./$filename

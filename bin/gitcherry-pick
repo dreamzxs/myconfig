@@ -1,0 +1,18 @@
+if [ -z $1 ]
+then
+	echo "--> warning: you should input commition."
+	exit 1;
+fi
+
+git fetch ;
+cur_banch=`git branch | grep "*" | cut -d " " -f 2`
+remote_name=`git branch -a | grep -v "\->" |grep  "remotes" | grep ${cur_banch} | cut -d "/" -f 2`
+remote_revision=`git gl ${remote_name}/${cur_banch}  -n 1 | cut -d " " -f 1`
+git reset $remote_name/$cur_banch --hard
+git pull $remote_name $cur_banch:$cur_banch
+git cherry-pick $@
+
+
+echo -e "\033[31;35;1m cherry-pick:${@} finish. \033[0m"
+echo -e "\033[31;35;1m ------------------------------------------------------------------\033[0m"
+git log  -n 10 --format="%Cgreen%h %Cred[%ci] %Creset<%an> %Creset %Cgreen%s %Creset  "

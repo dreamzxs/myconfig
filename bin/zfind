@@ -1,0 +1,111 @@
+#!/bin/bash
+################################################################################
+# Copyright Statement: CVTE
+# Copyright (C) 2015 Guangzhou Shiyuan Electronics Co.,Ltd. All rights reserved.
+#      ____________        _______________  ___________
+#     / / ________ \      / / _____   ____|| |  _______|
+#    / / /      \ \ \    / / /   | | |     | | |
+#   | | |        \ \ \  / / /    | | |     | | |_______
+#   | | |         \ \ \/ / /     | | |     | |  _______|
+#   | | |          \ \ \/ /      | | |     | | |
+#    \ \ \______    \ \  /       | | |     | | |_______
+#     \_\_______|    \_\/        |_|_|     |_|_________|
+#
+################################################################################
+# descript:
+#######################
+# filename: zfind
+# author  : chenming
+# date    : 2015-08-12
+# version : V1.0.0
+# note    :
+# =====================
+# auther  :
+# date    :
+# modify  :
+# version :
+# note    :
+#
+# =====================
+CONST_VERSION="V1.0.0"
+################################################################################
+
+
+function fun_help()
+{
+    echo -e "zfind [options] keystring [path]"
+    echo -e "  find keystring in path"
+    echo -e "  options:"
+    echo -e "     -s show the run command"
+    echo -e "     -v show script version"
+    echo -e "  eg:"
+    echo -e "  zfind chenming                  find \"chenming\" in current folder"
+    echo -e "  zfind chenming Supernva         find \"chenming\" in Supernova"
+}
+
+OPT_EN_SHOW=FALSE
+
+while getopts :svh OPT
+do
+   case $OPT in
+        s)  OPT_EN_SHOW="TRUE";;
+        h)
+            echo -en "\033[32;40;1m"
+            fun_help
+            echo -e "\033[0m"
+            exit 0
+            ;;
+        v)  
+            echo -en "\033[32;40;1m"
+            echo -e "version: ${CONST_VERSION}"
+            echo -e "\033[0m"
+            exit 0
+            ;;
+        ?)
+            echo -en "\033[31;40;1m"
+            echo -e  "format error!!!"
+            fun_help
+            echo -e "\033[0m"
+            exit 1;;
+    esac
+done
+
+## fisrt para  --> keystring
+## second pare --> path
+LOCAL_KEYSTR=""
+LOCAL_PATH="."
+idx=1
+while [ $idx -le $# ]
+do
+    # echo ${!idx}
+    item="${!idx}"
+
+    if [ ${item:0:1} != "-" ]; then
+        if [ "$LOCAL_KEYSTR"x == ""x ]; then
+            LOCAL_KEYSTR=$item
+        else
+            LOCAL_PATH=$item
+            break
+        fi
+    fi
+
+    let idx+=1
+done
+
+if [ "$LOCAL_KEYSTR"x == ""x ]; then
+    echo -en "\033[31;40;1m"
+    echo -e  "keystring must't empty"
+    fun_help
+    echo -e "\033[0m"
+    exit 1
+fi
+
+if test $OPT_EN_SHOW = "TRUE" ; then
+    echo -en "\033[32;40;1m"
+
+    echo "find ${LOCAL_PATH} -iname \"${LOCAL_KEYSTR}\""
+
+    echo -e "\033[0m"
+fi
+
+find ${LOCAL_PATH} -iname "${LOCAL_KEYSTR}"

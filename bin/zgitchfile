@@ -1,0 +1,5 @@
+#!/bin/bash
+args=$*
+
+git diff --name-status  $1^..$1 
+

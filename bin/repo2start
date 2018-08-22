@@ -1,0 +1,15 @@
+#!/bin/bash
+repo list>/dev/null
+if [ $? -ne 0 ];then
+	echo "there is not a repo project!"
+	exit 1;
+fi  
+echo "============== repo start ================="
+for i in `repo list|tr -d ' ' `
+do
+	proj=`echo $i|cut -d ':' -f2`
+	revision=`repo info $proj|grep "Current revision"|cut -d ':' -f2`
+	echo "$proj --> $revision"
+	repo start $revision $proj
+done
+echo "-------------------------------------------"
